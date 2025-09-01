@@ -21,7 +21,7 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 	<div class="mx-auto max-w-7xl p-4 md:p-8">
 		<header class="flex items-center justify-between gap-4 flex-wrap">
-			<h1 class="text-xl md:text-2xl font-extrabold tracking-tight">Grid Tour Creator</h1>
+			<h1 class="text-xl md:text-2xl font-extrabold tracking-tight">Grid Tour IM念 Creator</h1>
 			<div class="flex items-center gap-3">
 				<button id="clearState" class="text-slate-300 hover:text-white text-sm">Hapus data</button>
 				<a id="resetPage" class="text-slate-300 hover:text-white text-sm" href="<?= site_url('collage'); ?>">Reset</a>
