@@ -58,14 +58,26 @@
 					<label class="block">
 						<span class="text-sm">Label R1</span>
 						<input id="r1" value="R1" class="mt-1 w-full rounded-lg bg-slate-800/60 ring-1 ring-slate-700 px-3 py-2">
+						<div class="mt-1 flex items-center gap-2 text-xs text-slate-400">
+							<span>Ukuran</span>
+							<input id="r1Size" type="range" min="0.2" max="1.5" step="0.01" value="1" class="w-full">
+						</div>
 					</label>
 					<label class="block">
 						<span class="text-sm">Label R2</span>
 						<input id="r2" value="R2" class="mt-1 w-full rounded-lg bg-slate-800/60 ring-1 ring-slate-700 px-3 py-2">
+						<div class="mt-1 flex items-center gap-2 text-xs text-slate-400">
+							<span>Ukuran</span>
+							<input id="r2Size" type="range" min="0.2" max="1.5" step="0.01" value="1" class="w-full">
+						</div>
 					</label>
 					<label class="block">
 						<span class="text-sm">Label R3</span>
 						<input id="r3" value="R3" class="mt-1 w-full rounded-lg bg-slate-800/60 ring-1 ring-slate-700 px-3 py-2">
+						<div class="mt-1 flex items-center gap-2 text-xs text-slate-400">
+							<span>Ukuran</span>
+							<input id="r3Size" type="range" min="0.2" max="1.5" step="0.01" value="1" class="w-full">
+						</div>
 					</label>
 				</div>
 
@@ -155,6 +167,7 @@
 		const tiles = [...document.querySelectorAll('.upload-tile')];
 		const names = {left: document.getElementById('leftName'), right: document.getElementById('rightName')};
 		const labels = {r1: document.getElementById('r1'), r2: document.getElementById('r2'), r3: document.getElementById('r3')};
+		const labelSizes = { r1: document.getElementById('r1Size'), r2: document.getElementById('r2Size'), r3: document.getElementById('r3Size') };
 		const bg = document.getElementById('bg');
 		const sizeSel = document.getElementById('size');
 		const downloadBtn = document.getElementById('download');
@@ -262,6 +275,9 @@
 			for(let i=0;i<6;i++) updateTileUI(i);
 			names.left.value=''; names.right.value='';
 			labels.r1.value='R1'; labels.r2.value='R2'; labels.r3.value='R3';
+			if(labelSizes.r1) labelSizes.r1.value='1';
+			if(labelSizes.r2) labelSizes.r2.value='1';
+			if(labelSizes.r3) labelSizes.r3.value='1';
 			bg.value = '#111827'; sizeSel.value='1440x2160';
 			board.width=1440; board.height=2160; draw();
 		});
@@ -276,6 +292,9 @@
 		labels.r1.addEventListener('input', ()=>{ draw(); saveState(); });
 		labels.r2.addEventListener('input', ()=>{ draw(); saveState(); });
 		labels.r3.addEventListener('input', ()=>{ draw(); saveState(); });
+		labelSizes.r1.addEventListener('input', ()=>{ draw(); saveState(); });
+		labelSizes.r2.addEventListener('input', ()=>{ draw(); saveState(); });
+		labelSizes.r3.addEventListener('input', ()=>{ draw(); saveState(); });
 		bg.addEventListener('change', ()=>{ draw(); saveState(); });
 		sizeSel.addEventListener('change', ()=>{
 			const [w,h] = sizeSel.value.split('x').map(Number);
@@ -295,16 +314,19 @@
 				drawRoundedImage(state.images[i], x, y, tileW, tileH, 18, state.transforms[i]);
 			}
 			ctx.restore();
-			// center labels
+			// center labels dengan ukuran dinamis per R1/R2/R3
 			ctx.fillStyle = '#fff';
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
-			ctx.font = Math.floor(tileH*0.35)+'px Inter, system-ui, sans-serif';
+			const baseSize = tileH*0.35;
 			const centerX = board.width/2;
 			const centersY = [gap+tileH/2, gap*2+tileH*1.5, gap*3+tileH*2.5];
+			const sizes = [Number(labelSizes.r1.value)||1, Number(labelSizes.r2.value)||1, Number(labelSizes.r3.value)||1];
 			[labels.r1.value, labels.r2.value, labels.r3.value].forEach((t,idx)=>{
-				ctx.save(); ctx.globalAlpha=.35; ctx.fillText(t, centerX+4, centersY[idx]+4); ctx.restore();
-				ctx.fillText(t, centerX, centersY[idx]);
+                const px = Math.floor(baseSize * sizes[idx]);
+                ctx.font = px+'px Inter, system-ui, sans-serif';
+                ctx.save(); ctx.globalAlpha=.35; ctx.fillText(t, centerX+4, centersY[idx]+4); ctx.restore();
+                ctx.fillText(t, centerX, centersY[idx]);
 			});
 			// names - tebal + outline
 			ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
@@ -337,7 +359,8 @@
 				const dw = iw * scale; const dh = ih * scale;
 				const ox = t && typeof t.offsetX === 'number' ? t.offsetX : 0;
 				const oy = t && typeof t.offsetY === 'number' ? t.offsetY : 0;
-				const dx = x + (w - dw)/2 + ox;
+				// Anchor kiri secara default (horizontal), vertikal tetap center
+				const dx = x + 0 + ox;
 				const dy = y + (h - dh)/2 + oy;
 				ctx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh);
 			}
@@ -394,7 +417,8 @@
 				const dw = iw * scale; const dh = ih * scale;
 				const offX = t && typeof t.offsetX === 'number' ? t.offsetX : 0;
 				const offY = t && typeof t.offsetY === 'number' ? t.offsetY : 0;
-				const dx = (tileW - dw)/2 + offX; const dy = (tileH - dh)/2 + offY;
+				// Anchor kiri (horizontal), vertikal center
+				const dx = 0 + offX; const dy = (tileH - dh)/2 + offY;
 				const r = 18; ox.save();
 				const cr = Math.min(r, tileW/2, tileH/2);
 				ox.beginPath();
@@ -416,6 +440,7 @@
 				const payload = {
 					leftName: names.left.value||'', rightName: names.right.value||'',
 					r1: labels.r1.value||'R1', r2: labels.r2.value||'R2', r3: labels.r3.value||'R3',
+					r1Size: Number(labelSizes.r1.value)||1, r2Size: Number(labelSizes.r2.value)||1, r3Size: Number(labelSizes.r3.value)||1,
 					bg: bg.value, size: sizeSel.value,
 					images: state.dataUrls,
 					transforms: state.transforms
@@ -430,6 +455,9 @@
 				const p = JSON.parse(raw);
 				names.left.value = p.leftName||''; names.right.value = p.rightName||'';
 				labels.r1.value = p.r1||'R1'; labels.r2.value = p.r2||'R2'; labels.r3.value = p.r3||'R3';
+				if(labelSizes.r1) labelSizes.r1.value = String(p.r1Size||1);
+				if(labelSizes.r2) labelSizes.r2.value = String(p.r2Size||1);
+				if(labelSizes.r3) labelSizes.r3.value = String(p.r3Size||1);
 				bg.value = p.bg||'#111827'; sizeSel.value = p.size||'1440x2160';
 				const [w,h] = sizeSel.value.split('x').map(Number); board.width=w; board.height=h;
 				state.images = new Array(6).fill(null);
@@ -487,7 +515,8 @@
 			const baseScale = Math.max(editCanvas.width/iw, editCanvas.height/ih);
 			const scale = (workingTransform.scale||1) * baseScale;
 			const dw = iw*scale, dh = ih*scale;
-			const dx = (editCanvas.width - dw)/2 + (workingTransform.offsetX||0);
+			// Anchor kiri, vertikal center
+			const dx = 0 + (workingTransform.offsetX||0);
 			const dy = (editCanvas.height - dh)/2 + (workingTransform.offsetY||0);
 			const r = 18; editCtx.save(); const cr = Math.min(r, editCanvas.width/2, editCanvas.height/2);
 			editCtx.beginPath();
@@ -508,12 +537,9 @@
 			const baseScale = Math.max(editCanvas.width/iw, editCanvas.height/ih);
 			const scale = (tf.scale||1) * baseScale;
 			const dw = iw*scale, dh = ih*scale;
-			if (dw <= editCanvas.width) {
-				tf.offsetX = 0;
-			} else {
-				const maxX = (dw - editCanvas.width)/2;
-				tf.offsetX = Math.max(-maxX, Math.min(maxX, tf.offsetX||0));
-			}
+			// Dengan anchor kiri dan ingin tetap cover, offsetX berada di [minX, 0]
+			const minX = Math.min(0, editCanvas.width - dw);
+			tf.offsetX = Math.max(minX, Math.min(0, tf.offsetX||0));
 			if (dh <= editCanvas.height) {
 				tf.offsetY = 0;
 			} else {
