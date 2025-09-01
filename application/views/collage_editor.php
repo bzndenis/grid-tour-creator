@@ -83,7 +83,7 @@
 						<input id="bg" type="color" class="rounded-md bg-slate-800/60 ring-1 ring-slate-700 px-2 py-2" value="#111827">
 					</label>
 					<button id="download" class="ml-auto inline-flex items-center gap-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 font-semibold">Unduh PNG</button>
-					<button id="saveServer" class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 font-semibold">Render Server</button>
+					<!-- <button id="saveServer" class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 font-semibold">Render Server</button> -->
 				</div>
 			</section>
 
