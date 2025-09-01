@@ -123,6 +123,28 @@
 				</div>
 			</div>
 		</div>
+		<!-- Modal Tutorial -->
+		<div id="tutorialModal" class="fixed inset-0 z-50 hidden">
+			<div class="absolute inset-0 bg-black/60"></div>
+			<div class="relative mx-auto max-w-xl w-full mt-10 bg-slate-900 rounded-xl ring-1 ring-slate-700 shadow-2xl p-5">
+				<h3 class="font-semibold text-lg mb-2">Selamat datang 👋</h3>
+				<p class="text-sm text-slate-300 mb-3">Cara cepat menggunakan aplikasi:</p>
+				<ol class="list-decimal list-inside space-y-2 text-sm text-slate-200">
+					<li>Unggah hingga 6 gambar. Klik untuk pilih atau drag antar slot.</li>
+					<li>Isi nama kiri/kanan dan label R1–R3.</li>
+					<li>Pilih ukuran dan warna latar; lihat hasil di preview.</li>
+					<li>Double click gambar untuk edit posisi dan zoom.</li>
+					<li>Klik "Unduh PNG" untuk menyimpan hasil.</li>
+				</ol>
+				<div class="mt-4 flex items-center justify-between">
+					<label class="flex items-center gap-2 text-sm text-slate-300">
+						<input id="dontShowTutorial" type="checkbox" class="rounded">
+						<span>Jangan tampilkan lagi</span>
+					</label>
+					<button id="closeTutorial" class="inline-flex items-center gap-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 font-semibold">Mulai</button>
+				</div>
+			</div>
+		</div>
 	</div>
 
 	<script>
@@ -137,6 +159,10 @@
 		const sizeSel = document.getElementById('size');
 		const downloadBtn = document.getElementById('download');
 		const saveServerBtn = document.getElementById('saveServer');
+		const TUTORIAL_KEY = 'grid-tour-creator-tutorial-v1';
+		const tutorialModal = document.getElementById('tutorialModal');
+		const closeTutorialBtn = document.getElementById('closeTutorial');
+		const dontShowTutorial = document.getElementById('dontShowTutorial');
 
 		// state kini menyimpan dataUrls untuk restore + transform per-slot
 		const STORAGE_KEY = 'grid-tour-creator-v1';
@@ -327,7 +353,7 @@
 			a.click();
 		});
 
-		saveServerBtn.addEventListener('click', async ()=>{
+		if (saveServerBtn) saveServerBtn.addEventListener('click', async ()=>{
 			const fd = new FormData();
 			const [w,h] = sizeSel.value.split('x').map(Number);
 			fd.append('width', w); fd.append('height', h); fd.append('bg', bg.value);
@@ -419,6 +445,25 @@
 		}
 
 		restoreState();
+
+		function maybeShowTutorial(){
+			try{
+				if(localStorage.getItem(TUTORIAL_KEY)==='1') return;
+				if(tutorialModal) tutorialModal.classList.remove('hidden');
+			}catch(e){}
+		}
+		maybeShowTutorial();
+
+		if (closeTutorialBtn){
+			closeTutorialBtn.addEventListener('click', ()=>{
+				try{
+					if(dontShowTutorial && dontShowTutorial.checked){
+						localStorage.setItem(TUTORIAL_KEY, '1');
+					}
+				}catch(e){}
+				if(tutorialModal) tutorialModal.classList.add('hidden');
+			});
+		}
 
 		function openEditor(idx){
 			editingIndex = idx;
