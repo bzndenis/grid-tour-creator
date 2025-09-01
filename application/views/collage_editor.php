@@ -95,6 +95,34 @@
 				<canvas id="board" width="1440" height="2160" class="w-full h-auto max-h-[85vh] shadow-xl"></canvas>
 			</section>
 		</div>
+
+		<!-- Modal Editor Gambar -->
+		<div id="editorModal" class="fixed inset-0 z-50 hidden">
+			<div class="absolute inset-0 bg-black/60"></div>
+			<div class="relative mx-auto max-w-4xl w-full h-[80vh] mt-10 bg-slate-900 rounded-xl ring-1 ring-slate-700 shadow-2xl flex flex-col">
+				<div class="p-3 border-b border-slate-700 flex items-center gap-3">
+					<h3 class="font-semibold">Edit Gambar</h3>
+					<div class="ml-auto flex items-center gap-2">
+						<button id="resetTransform" class="text-sm px-3 py-1 rounded bg-slate-700 hover:bg-slate-600">Reset</button>
+						<button id="saveTransform" class="text-sm px-3 py-1 rounded bg-indigo-500 hover:bg-indigo-400 text-white">Simpan</button>
+						<button id="closeEditor" class="text-sm px-3 py-1 rounded bg-slate-700 hover:bg-slate-600">Tutup</button>
+					</div>
+				</div>
+				<div class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-0">
+					<div class="col-span-3 flex items-center justify-center p-4">
+						<canvas id="editCanvas" class="max-w-full max-h-full shadow-lg cursor-move"></canvas>
+					</div>
+					<div class="border-l border-slate-700 p-4 space-y-4">
+						<div>
+							<p class="text-xs text-slate-400">Gunakan scroll untuk zoom, drag untuk geser</p>
+						</div>
+						<label class="block text-sm">Zoom
+							<input id="zoomRange" type="range" min="0.5" max="4" step="0.01" value="1" class="w-full">
+						</label>
+					</div>
+				</div>
+			</div>
+		</div>
 	</div>
 
 	<script>
@@ -110,9 +138,23 @@
 		const downloadBtn = document.getElementById('download');
 		const saveServerBtn = document.getElementById('saveServer');
 
-		// state kini menyimpan dataUrls untuk restore
+		// state kini menyimpan dataUrls untuk restore + transform per-slot
 		const STORAGE_KEY = 'grid-tour-creator-v1';
-		const state = { images: new Array(6).fill(null), dataUrls: new Array(6).fill(null) };
+		const state = { images: new Array(6).fill(null), dataUrls: new Array(6).fill(null), transforms: new Array(6).fill(0).map(()=>({scale:1, offsetX:0, offsetY:0})) };
+
+		// Editor modal refs
+		const editorModal = document.getElementById('editorModal');
+		const editCanvas = document.getElementById('editCanvas');
+		const editCtx = editCanvas.getContext('2d');
+		const zoomRange = document.getElementById('zoomRange');
+		const saveTransformBtn = document.getElementById('saveTransform');
+		const resetTransformBtn = document.getElementById('resetTransform');
+		const closeEditorBtn = document.getElementById('closeEditor');
+		let editingIndex = null;
+		let workingTransform = null;
+		let isDragging = false; let dragStartX = 0; let dragStartY = 0;
+		// Disable default touch gestures (pinch/scroll) on editor canvas
+		editCanvas.style.touchAction = 'none';
 
 		function updateTileUI(i){
 			const tile = tiles[i];
@@ -140,7 +182,8 @@
 				const img = new Image();
 				img.onload = ()=>{
 					state.images[slot] = img;
-					state.dataUrls[slot] = makeDataUrl(img);
+					state.transforms[slot] = {scale:1, offsetX:0, offsetY:0};
+					state.dataUrls[slot] = makeDataUrl(img, state.transforms[slot]);
 					updateTileUI(slot); draw(); saveState();
 				};
 				img.src = URL.createObjectURL(file);
@@ -166,8 +209,17 @@
 				if(dragIndex===idx) return;
 				const tmp = state.images[idx]; state.images[idx] = state.images[dragIndex]; state.images[dragIndex] = tmp;
 				const tmpU = state.dataUrls[idx]; state.dataUrls[idx] = state.dataUrls[dragIndex]; state.dataUrls[dragIndex] = tmpU;
+				const tmpT = state.transforms[idx]; state.transforms[idx] = state.transforms[dragIndex]; state.transforms[dragIndex] = tmpT;
 				updateTileUI(idx); updateTileUI(dragIndex);
 				draw(); saveState(); dragIndex = null;
+			});
+		});
+
+		// Buka editor dengan double click pada tile berisi gambar
+		tiles.forEach((tile, idx)=>{
+			tile.addEventListener('dblclick', ()=>{
+				if(!(state.images[idx] || state.dataUrls[idx])) return;
+				openEditor(idx);
 			});
 		});
 
@@ -180,6 +232,7 @@
 			localStorage.removeItem('grid-tour-creator-v1');
 			state.images = new Array(6).fill(null);
 			state.dataUrls = new Array(6).fill(null);
+			state.transforms = new Array(6).fill(0).map(()=>({scale:1, offsetX:0, offsetY:0}));
 			for(let i=0;i<6;i++) updateTileUI(i);
 			names.left.value=''; names.right.value='';
 			labels.r1.value='R1'; labels.r2.value='R2'; labels.r3.value='R3';
@@ -213,7 +266,7 @@
 				const c = i%2, r = Math.floor(i/2);
 				const x = gap + c*(tileW+gap);
 				const y = gap + r*(tileH+gap);
-				drawRoundedImage(state.images[i], x, y, tileW, tileH, 18);
+				drawRoundedImage(state.images[i], x, y, tileW, tileH, 18, state.transforms[i]);
 			}
 			ctx.restore();
 			// center labels
@@ -240,7 +293,7 @@
 			ctx.fillText(txt, board.width - 28 - w, 28 + parseInt(board.width*0.065));
 		}
 
-		function drawRoundedImage(img, x, y, w, h, r){
+		function drawRoundedImage(img, x, y, w, h, r, t){
 			ctx.save();
 			r = Math.min(r, w/2, h/2);
 			ctx.beginPath();
@@ -253,10 +306,14 @@
 			ctx.clip();
 			if(img){
 				const iw = img.naturalWidth, ih = img.naturalHeight;
-				const sr = iw/ih, dr = w/h;
-				let sw, sh, sx, sy;
-				if(sr>dr){ sh=ih; sw=ih*dr; sx=0; sy=0; } else { sw=iw; sh=iw/dr; sx=0; sy=(ih-sh)/2; }
-				ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+				const baseScale = Math.max(w/iw, h/ih);
+				const scale = (t && t.scale ? t.scale : 1) * baseScale;
+				const dw = iw * scale; const dh = ih * scale;
+				const ox = t && typeof t.offsetX === 'number' ? t.offsetX : 0;
+				const oy = t && typeof t.offsetY === 'number' ? t.offsetY : 0;
+				const dx = x + (w - dw)/2 + ox;
+				const dy = y + (h - dh)/2 + oy;
+				ctx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh);
 			}
 			ctx.restore();
 		}
@@ -280,6 +337,12 @@
 			fd.append('r2', labels.r2.value||'R2');
 			fd.append('r3', labels.r3.value||'R3');
 			inputs.forEach((input,idx)=>{ if(input.files[0]) fd.append('img'+(idx+1), input.files[0]); });
+			state.transforms.forEach((t,idx)=>{
+				const i = idx+1; const tf = t||{scale:1, offsetX:0, offsetY:0};
+				fd.append('img'+i+'_scale', String(tf.scale||1));
+				fd.append('img'+i+'_ox', String(Math.round((tf.offsetX||0))));
+				fd.append('img'+i+'_oy', String(Math.round((tf.offsetY||0))));
+			});
 			draw(); saveState();
 			const res = await fetch('<?= site_url('collage/generate'); ?>', { method:'POST', body: fd });
 			const blob = await res.blob();
@@ -294,15 +357,30 @@
 			const tileH = Math.floor((board.height - (gap * (rows+1))) / rows);
 			return {tileW, tileH};
 		}
-		function makeDataUrl(image){
+		function makeDataUrl(image, t){
 			try{
 				const {tileW, tileH} = getLayout();
 				const oc = document.createElement('canvas'); oc.width = tileW; oc.height = tileH;
 				const ox = oc.getContext('2d');
-				const iw = image.naturalWidth, ih = image.naturalHeight; const dr = tileW/tileH; const sr = iw/ih;
-				let sw, sh, sx, sy;
-				if(sr>dr){ sh=ih; sw=ih*dr; sx=0; sy=0; } else { sw=iw; sh=iw/dr; sx=0; sy=(ih-sh)/2; }
-				ox.drawImage(image, sx, sy, sw, sh, 0, 0, tileW, tileH);
+				const iw = image.naturalWidth, ih = image.naturalHeight;
+				const baseScale = Math.max(tileW/iw, tileH/ih);
+				const scale = (t && t.scale ? t.scale : 1) * baseScale;
+				const dw = iw * scale; const dh = ih * scale;
+				const offX = t && typeof t.offsetX === 'number' ? t.offsetX : 0;
+				const offY = t && typeof t.offsetY === 'number' ? t.offsetY : 0;
+				const dx = (tileW - dw)/2 + offX; const dy = (tileH - dh)/2 + offY;
+				const r = 18; ox.save();
+				const cr = Math.min(r, tileW/2, tileH/2);
+				ox.beginPath();
+				ox.moveTo(cr, 0);
+				ox.arcTo(tileW, 0, tileW, tileH, cr);
+				ox.arcTo(tileW, tileH, 0, tileH, cr);
+				ox.arcTo(0, tileH, 0, 0, cr);
+				ox.arcTo(0, 0, tileW, 0, cr);
+				ox.closePath();
+				ox.clip();
+				ox.drawImage(image, 0, 0, iw, ih, dx, dy, dw, dh);
+				ox.restore();
 				return oc.toDataURL('image/jpeg', 0.9);
 			}catch(e){ return null; }
 		}
@@ -313,7 +391,8 @@
 					leftName: names.left.value||'', rightName: names.right.value||'',
 					r1: labels.r1.value||'R1', r2: labels.r2.value||'R2', r3: labels.r3.value||'R3',
 					bg: bg.value, size: sizeSel.value,
-					images: state.dataUrls
+					images: state.dataUrls,
+					transforms: state.transforms
 				};
 				localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 			}catch(e){ console.warn('Save state gagal', e); }
@@ -329,6 +408,9 @@
 				const [w,h] = sizeSel.value.split('x').map(Number); board.width=w; board.height=h;
 				state.images = new Array(6).fill(null);
 				state.dataUrls = (p.images||new Array(6).fill(null));
+				state.transforms = (p.transforms && Array.isArray(p.transforms) && p.transforms.length===6)
+					? p.transforms.map(t=>({scale: Number(t && t.scale)||1, offsetX: Number(t && t.offsetX)||0, offsetY: Number(t && t.offsetY)||0}))
+					: new Array(6).fill(0).map(()=>({scale:1, offsetX:0, offsetY:0}));
 				state.dataUrls.forEach((src, i)=>{
 					if(!src) return; const img = new Image(); img.onload = ()=>{ state.images[i]=img; updateTileUI(i); draw(); }; img.src = src;
 				});
@@ -337,6 +419,103 @@
 		}
 
 		restoreState();
+
+		function openEditor(idx){
+			editingIndex = idx;
+			const {tileW, tileH} = getLayout();
+			editCanvas.width = tileW; editCanvas.height = tileH;
+			workingTransform = Object.assign({scale:1, offsetX:0, offsetY:0}, state.transforms[idx]||{});
+			zoomRange.value = String(workingTransform.scale||1);
+			editorModal.classList.remove('hidden');
+			drawEditor();
+		}
+
+		function closeEditor(){
+			editorModal.classList.add('hidden');
+			editingIndex = null; workingTransform = null; isDragging=false;
+		}
+
+		function drawEditor(){
+			editCtx.fillStyle = bg.value; editCtx.fillRect(0,0,editCanvas.width,editCanvas.height);
+			const img = state.images[editingIndex]; if(!img) return;
+			const iw = img.naturalWidth, ih = img.naturalHeight;
+			const baseScale = Math.max(editCanvas.width/iw, editCanvas.height/ih);
+			const scale = (workingTransform.scale||1) * baseScale;
+			const dw = iw*scale, dh = ih*scale;
+			const dx = (editCanvas.width - dw)/2 + (workingTransform.offsetX||0);
+			const dy = (editCanvas.height - dh)/2 + (workingTransform.offsetY||0);
+			const r = 18; editCtx.save(); const cr = Math.min(r, editCanvas.width/2, editCanvas.height/2);
+			editCtx.beginPath();
+			editCtx.moveTo(cr, 0);
+			editCtx.arcTo(editCanvas.width, 0, editCanvas.width, editCanvas.height, cr);
+			editCtx.arcTo(editCanvas.width, editCanvas.height, 0, editCanvas.height, cr);
+			editCtx.arcTo(0, editCanvas.height, 0, 0, cr);
+			editCtx.arcTo(0, 0, editCanvas.width, 0, cr);
+			editCtx.closePath();
+			editCtx.clip();
+			editCtx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh);
+			editCtx.restore();
+		}
+
+		function clampTransform(tf){
+			const img = state.images[editingIndex]; if(!img) return tf;
+			const iw = img.naturalWidth, ih = img.naturalHeight;
+			const baseScale = Math.max(editCanvas.width/iw, editCanvas.height/ih);
+			const scale = (tf.scale||1) * baseScale;
+			const dw = iw*scale, dh = ih*scale;
+			if (dw <= editCanvas.width) {
+				tf.offsetX = 0;
+			} else {
+				const maxX = (dw - editCanvas.width)/2;
+				tf.offsetX = Math.max(-maxX, Math.min(maxX, tf.offsetX||0));
+			}
+			if (dh <= editCanvas.height) {
+				tf.offsetY = 0;
+			} else {
+				const maxY = (dh - editCanvas.height)/2;
+				tf.offsetY = Math.max(-maxY, Math.min(maxY, tf.offsetY||0));
+			}
+			return tf;
+		}
+
+		// Editor events
+		editCanvas.addEventListener('pointerdown', (e)=>{
+			if(editingIndex===null) return; e.preventDefault(); isDragging = true; editCanvas.setPointerCapture(e.pointerId);
+			dragStartX = e.clientX; dragStartY = e.clientY;
+		});
+		editCanvas.addEventListener('pointermove', (e)=>{
+			if(!isDragging || editingIndex===null) return;
+			const dx = e.clientX - dragStartX; const dy = e.clientY - dragStartY;
+			dragStartX = e.clientX; dragStartY = e.clientY;
+			// Convert movement from CSS pixels to canvas pixels
+			const rect = editCanvas.getBoundingClientRect();
+			const scaleX = rect.width ? (editCanvas.width / rect.width) : 1;
+			const scaleY = rect.height ? (editCanvas.height / rect.height) : 1;
+			workingTransform.offsetX = (workingTransform.offsetX||0) + dx * scaleX;
+			workingTransform.offsetY = (workingTransform.offsetY||0) + dy * scaleY;
+			clampTransform(workingTransform); drawEditor();
+		});
+		editCanvas.addEventListener('pointerup', (e)=>{ if(!isDragging) return; isDragging=false; editCanvas.releasePointerCapture(e.pointerId); });
+		editCanvas.addEventListener('pointerleave', ()=>{ isDragging=false; });
+		editCanvas.addEventListener('pointercancel', ()=>{ isDragging=false; });
+		editCanvas.addEventListener('wheel', (e)=>{
+			if(editingIndex===null) return; e.preventDefault();
+			const delta = e.deltaY; const old = workingTransform.scale||1; let next = old * (delta>0 ? 0.95 : 1.05);
+			next = Math.max(0.5, Math.min(4, next));
+			workingTransform.scale = next; clampTransform(workingTransform); zoomRange.value = String(next); drawEditor();
+		},{passive:false});
+		zoomRange.addEventListener('input', ()=>{ if(editingIndex===null) return; workingTransform.scale = Number(zoomRange.value)||1; clampTransform(workingTransform); drawEditor(); });
+		resetTransformBtn.addEventListener('click', ()=>{ if(editingIndex===null) return; workingTransform = {scale:1, offsetX:0, offsetY:0}; zoomRange.value = '1'; drawEditor(); });
+		saveTransformBtn.addEventListener('click', ()=>{
+			if(editingIndex===null) return;
+			state.transforms[editingIndex] = { scale: Number(workingTransform.scale)||1, offsetX: Number(workingTransform.offsetX)||0, offsetY: Number(workingTransform.offsetY)||0 };
+			if(state.images[editingIndex]){
+				state.dataUrls[editingIndex] = makeDataUrl(state.images[editingIndex], state.transforms[editingIndex]);
+				updateTileUI(editingIndex);
+			}
+			draw(); saveState(); closeEditor();
+		});
+		closeEditorBtn.addEventListener('click', ()=> closeEditor());
 	})();
 	</script>
 </body>

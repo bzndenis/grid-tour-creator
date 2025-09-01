@@ -45,7 +45,7 @@ class Collage extends CI_Controller {
 		// Load fonts (prioritas: bundled Inter -> Windows Arial -> DejaVu)
 		list($fontRegular, $fontBold) = $this->resolveFonts();
 
-		// Draw grid images
+		// Draw grid images with optional client transform (scale + offsets)
 		for ($i = 1; $i <= 6; $i++) {
 			if (!isset($_FILES['img'.$i]) || $_FILES['img'.$i]['error'] !== UPLOAD_ERR_OK) continue;
 			$src = $this->createImageFromUpload($_FILES['img'.$i]['tmp_name']);
@@ -54,7 +54,10 @@ class Collage extends CI_Controller {
 			$row = (int)floor(($i-1) / 2);
 			$dstX = $gap + $col * ($tileW + $gap);
 			$dstY = $gap + $row * ($tileH + $gap);
-			$this->smartCopyResize($canvas, $src, $dstX, $dstY, $tileW, $tileH, 18);
+			$scale = (float)($this->input->post('img'.$i.'_scale') ?: 1);
+			$offX = (int)($this->input->post('img'.$i.'_ox') ?: 0);
+			$offY = (int)($this->input->post('img'.$i.'_oy') ?: 0);
+			$this->placeTransformed($canvas, $src, $dstX, $dstY, $tileW, $tileH, 18, $scale, $offX, $offY);
 			imagedestroy($src);
 		}
 
@@ -139,6 +142,28 @@ class Collage extends CI_Controller {
 		}
 		imagecopy($dstCanvas, $temp, $dstX, $dstY, 0, 0, $dstW, $dstH);
 		imagedestroy($temp);
+	}
+
+	private function placeTransformed($dstCanvas, $srcImg, $dstX, $dstY, $dstW, $dstH, $radius, $scale, $offX, $offY)
+	{
+		$srcW = imagesx($srcImg); $srcH = imagesy($srcImg);
+		$baseScale = max($dstW/$srcW, $dstH/$srcH);
+		$finalScale = max(0.5, min(4.0, (float)$scale)) * $baseScale;
+		$drawW = (int)round($srcW * $finalScale);
+		$drawH = (int)round($srcH * $finalScale);
+		$dx = (int)round($dstX + ($dstW - $drawW)/2 + (int)$offX);
+		$dy = (int)round($dstY + ($dstH - $drawH)/2 + (int)$offY);
+
+		// draw scaled src onto temp tile with offset
+		$tile = imagecreatetruecolor($dstW, $dstH);
+		// fill with transparent-like black and copy
+		imagecopyresampled($tile, $srcImg, $dx - $dstX, $dy - $dstY, 0, 0, $drawW, $drawH, $srcW, $srcH);
+
+		if ($radius > 0) {
+			$this->applyRoundedCorners($tile, $radius);
+		}
+		imagecopy($dstCanvas, $tile, $dstX, $dstY, 0, 0, $dstW, $dstH);
+		imagedestroy($tile);
 	}
 
 	private function applyRoundedCorners(&$img, $radius)
