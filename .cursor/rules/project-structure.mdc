@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+---
+## Grid Tour Creator – Project Structure
+
+This is a PHP CodeIgniter 3 application.
+
+- **Frontend view**: [`application/views/collage_editor.php`](mdc:application/views/collage_editor.php)
+- **Main controller**: [`application/controllers/Collage.php`](mdc:application/controllers/Collage.php)
+- **Routing**: [`application/config/routes.php`](mdc:application/config/routes.php)
+- **Framework bootstrap**: [`index.php`](mdc:index.php), framework core in [`system/`](mdc:system)
+
+### Entry flow
+- Default route points to `collage` controller `index` method, which renders the collage editor view.
+- The editor posts to `collage/generate` for server-side image rendering via GD.
+
+### Conventions
+- Use CodeIgniter helpers/loader APIs and keep business logic in controllers or libraries.
+- Keep assets embedded or external via CDN as in the editor view; no build step required.
+

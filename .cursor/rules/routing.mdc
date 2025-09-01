@@ -1,0 +1,21 @@
+---
+description: URL routing and endpoints
+globs: application/config/routes.php
+---
+## Routing
+
+- **Default controller**: `collage`
+- **Endpoints**:
+  - `GET /collage` → `Collage@index` renders the editor
+  - `POST /collage/generate` → `Collage@generate` returns a PNG stream
+
+Defined in [`application/config/routes.php`](mdc:application/config/routes.php):
+
+```12:57:application/config/routes.php
+$route['default_controller'] = 'collage';
+$route['404_override'] = '';
+$route['translate_uri_dashes'] = FALSE;
+$route['collage'] = 'collage/index';
+$route['collage/generate'] = 'collage/generate';
+```
+

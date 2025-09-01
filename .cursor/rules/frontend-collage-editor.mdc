@@ -1,0 +1,33 @@
+---
+description: Frontend collage editor implementation details
+globs: application/views/collage_editor.php
+---
+## Frontend – Collage Editor
+
+- **Stack**: Tailwind via CDN, vanilla JS, `<canvas>` drawing.
+- **File**: [`application/views/collage_editor.php`](mdc:application/views/collage_editor.php)
+
+### Features
+- 6 image slots with drag-and-drop reordering.
+- Left/right names and three center labels (R1–R3).
+- Size presets: 1440×2160, 1080×1920, 2048×3072.
+- Background color picker.
+- Local persistence in `localStorage` key `grid-tour-creator-v1`.
+
+### Layout math
+- 2 columns × 3 rows grid, `gap = 28`. Rounded corners radius `18` on tiles.
+
+### Client–Server contract
+- POST `multipart/form-data` to `collage/generate` with fields:
+  - `width`, `height`, `bg`, `leftName`, `rightName`, `r1`, `r2`, `r3`
+  - Files: `img1`..`img6` (optional)
+- Response: `image/png` stream; client triggers download as `collage.png`.
+
+### Persistence format
+```292:336:application/views/collage_editor.php
+function saveState(){
+  const payload = { leftName, rightName, r1, r2, r3, bg, size, images };
+  localStorage.setItem('grid-tour-creator-v1', JSON.stringify(payload));
+}
+```
+

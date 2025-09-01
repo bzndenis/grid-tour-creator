@@ -1,0 +1,22 @@
+---
+description: PHP & CodeIgniter conventions for this repo
+globs: application/**/*.php,system/**/*.php,index.php
+---
+## PHP/CodeIgniter Conventions
+
+- **Controllers**: Extend `CI_Controller`. Load views with `$this->load->view('view_name')`. Access input via `$this->input->post('key')`.
+- **Security headers**: `X-Frame-Options: SAMEORIGIN` is set in `Collage::__construct`.
+- **Helpers**: Load via `$this->load->helper('file')` etc.
+
+### GD Rendering Guidelines
+- Use `imagecreatetruecolor`, `imagecopyresampled`, and `imagettftext` for server rendering.
+- Prefer deterministic layout math matching the frontend: 2 columns × 3 rows with a `28` gap, rounded corners radius `18`.
+- Fonts: resolve in priority order Inter (bundled under `application/third_party/fonts`), Windows Arial, DejaVu on Linux.
+- Output PNG with headers:
+  - `Content-Type: image/png`
+  - `Content-Disposition: inline; filename="collage.png"`
+
+### Error handling
+- Fail soft on missing uploads; render remaining tiles.
+- Sanitize/normalize color hex (expand 3-digit to 6-digit) before conversion.
+
