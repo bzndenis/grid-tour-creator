@@ -140,6 +140,7 @@
 			<div class="absolute inset-0 bg-black/60"></div>
 			<div class="relative mx-auto max-w-xl w-full mt-10 bg-slate-900 rounded-xl ring-1 ring-slate-700 shadow-2xl p-5">
 				<h3 class="font-semibold text-lg mb-2">Selamat datang 👋</h3>
+				<h3 class="font-semibold text-lg mb-2">HAPPY 2nd ANNIV IM念♥️</h3>
 				<p class="text-sm text-slate-300 mb-3">Cara cepat menggunakan aplikasi:</p>
 				<ol class="list-decimal list-inside space-y-2 text-sm text-slate-200">
 					<li>Unggah hingga 6 gambar. Klik untuk pilih atau drag antar slot.</li>
